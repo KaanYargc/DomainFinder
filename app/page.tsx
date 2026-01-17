@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { checkDomain, generateDomainNames, checkSocialMedia } from './actions'
+import { checkDomain, generateDomainNames, checkSocialMedia, analyzeBestDomains } from './actions'
 
 type DomainResult = {
   domain: string
@@ -32,6 +32,9 @@ export default function Home() {
   const [sortBy, setSortBy] = useState('default')
   const [lengthFilter, setLengthFilter] = useState('all')
   const [socialResults, setSocialResults] = useState<Record<string, any[]>>({})
+  const [phase, setPhase] = useState<1 | 2>(1)
+  const [bestDomains, setBestDomains] = useState<string[]>([])
+  const [analyzingPhase2, setAnalyzingPhase2] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites')
@@ -47,6 +50,8 @@ export default function Home() {
     setSuggestions([])
     setResults({})
     setSocialResults({})
+    setPhase(1)
+    setBestDomains([])
     
     setProgressText('AI domain isimleri oluşturuluyor...')
     setProgress(10)
@@ -62,7 +67,7 @@ export default function Home() {
     
     for (let i = 0; i < names.length; i++) {
       const name = names[i]
-      setProgressText(`${i + 1}/${totalSteps} domain taranıyor: ${name}`)
+      setProgressText(`Faz 1: ${i + 1}/${totalSteps} domain taranıyor: ${name}`)
       setProgress(20 + ((i + 1) / totalSteps) * 80)
       
       const [domainResults, socialRes] = await Promise.all([
@@ -87,6 +92,28 @@ export default function Home() {
     const newHistory = [keywords, ...history.filter(h => h !== keywords)].slice(0, 10)
     setHistory(newHistory)
     localStorage.setItem('history', JSON.stringify(newHistory))
+  }
+
+  const handlePhase2 = async () => {
+    setAnalyzingPhase2(true)
+    setProgressText('Faz 2: En iyi domainler analiz ediliyor...')
+    
+    const availableDomains = Object.entries(results)
+      .flatMap(([name, domains]) => 
+        domains.filter(d => d.available).map(d => d.domain)
+      )
+    
+    if (availableDomains.length === 0) {
+      setAnalyzingPhase2(false)
+      setProgressText('')
+      return
+    }
+    
+    const ranked = await analyzeBestDomains(availableDomains)
+    setBestDomains(ranked)
+    setPhase(2)
+    setAnalyzingPhase2(false)
+    setProgressText('')
   }
 
   const toggleFavorite = (domain: string) => {
@@ -206,47 +233,69 @@ export default function Home() {
 
         {suggestions.length > 0 && (
           <>
-            <div className="flex gap-4 items-center">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40 dark:bg-slate-800">
-                  <SelectValue placeholder="Sırala" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Varsayılan</SelectItem>
-                  <SelectItem value="available">Müsaitlik</SelectItem>
-                  <SelectItem value="length">Uzunluk</SelectItem>
-                  <SelectItem value="alpha">Alfabetik</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={lengthFilter} onValueChange={setLengthFilter}>
-                <SelectTrigger className="w-40 dark:bg-slate-800">
-                  <SelectValue placeholder="Filtre" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tümü</SelectItem>
-                  <SelectItem value="short">Kısa (≤8)</SelectItem>
-                  <SelectItem value="long">Uzun (&gt;8)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex gap-2 ml-auto">
-                <Button variant="outline" size="sm" onClick={() => exportResults('csv')}>
-                  <Download className="w-4 h-4 mr-2" />
-                  CSV
+            <div className="flex gap-4 items-center flex-wrap">
+              <div className="flex gap-2">
+                <Button 
+                  variant={phase === 1 ? 'default' : 'outline'} 
+                  onClick={() => setPhase(1)}
+                >
+                  Faz 1: Tüm Sonuçlar
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => exportResults('json')}>
-                  <Download className="w-4 h-4 mr-2" />
-                  JSON
+                <Button 
+                  variant={phase === 2 ? 'default' : 'outline'} 
+                  onClick={handlePhase2}
+                  disabled={analyzingPhase2}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {analyzingPhase2 ? 'Analiz ediliyor...' : 'Faz 2: En İyiler'}
                 </Button>
               </div>
+
+              {phase === 1 && (
+                <>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-40 dark:bg-slate-800">
+                      <SelectValue placeholder="Sırala" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Varsayılan</SelectItem>
+                      <SelectItem value="available">Müsaitlik</SelectItem>
+                      <SelectItem value="length">Uzunluk</SelectItem>
+                      <SelectItem value="alpha">Alfabetik</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={lengthFilter} onValueChange={setLengthFilter}>
+                    <SelectTrigger className="w-40 dark:bg-slate-800">
+                      <SelectValue placeholder="Filtre" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tümü</SelectItem>
+                      <SelectItem value="short">Kısa (≤8)</SelectItem>
+                      <SelectItem value="long">Uzun (&gt;8)</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex gap-2 ml-auto">
+                    <Button variant="outline" size="sm" onClick={() => exportResults('csv')}>
+                      <Download className="w-4 h-4 mr-2" />
+                      CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => exportResults('json')}>
+                      <Download className="w-4 h-4 mr-2" />
+                      JSON
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="dark:bg-slate-800">
-                <TabsTrigger value="all">Tümü ({getSortedSuggestions().length})</TabsTrigger>
-                <TabsTrigger value="favorites">Favoriler ({favorites.length})</TabsTrigger>
-              </TabsList>
+            {phase === 1 && (
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="dark:bg-slate-800">
+                  <TabsTrigger value="all">Tümü ({getSortedSuggestions().length})</TabsTrigger>
+                  <TabsTrigger value="favorites">Favoriler ({favorites.length})</TabsTrigger>
+                </TabsList>
 
               <TabsContent value="all" className="space-y-6 mt-6">
                 {getSortedSuggestions().map((name) => {
@@ -452,6 +501,91 @@ export default function Home() {
                 )}
               </TabsContent>
             </Tabs>
+            )}
+
+            {phase === 2 && bestDomains.length > 0 && (
+              <div className="space-y-4">
+                <Card className="dark:bg-slate-800 border-yellow-300 dark:border-yellow-700">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Sparkles className="w-5 h-5 text-yellow-600" />
+                      <h2 className="text-xl font-bold dark:text-white">AI Tarafından Seçilen En İyi Domainler</h2>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Müsait domainler arasından marka değeri, telaffuz kolaylığı ve SEO potansiyeline göre sıralandı.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {bestDomains.map((domain, index) => {
+                  const [name, ext] = domain.split('.')
+                  const domainData = results[name]?.find(d => d.domain === domain)
+                  const social = socialResults[name] || []
+
+                  return (
+                    <Card key={domain} className="dark:bg-slate-800 border-green-300 dark:border-green-700">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-4 flex-1">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 font-bold text-lg flex-shrink-0">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-2xl font-bold font-mono dark:text-white">{domain}</h3>
+                                <Badge variant="outline" className="bg-green-50 dark:bg-green-900">Müsait</Badge>
+                                {domainData && (
+                                  <Badge variant="outline">{domainData.price}</Badge>
+                                )}
+                              </div>
+                              
+                              {social.length > 0 && (
+                                <div className="flex gap-2 flex-wrap mb-3">
+                                  {social.map(s => (
+                                    <Badge 
+                                      key={s.platform} 
+                                      variant="outline"
+                                      className={s.available ? 'bg-green-50 dark:bg-green-900' : ''}
+                                    >
+                                      {s.platform}: {s.available ? '✓' : '✗'}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => window.open(`https://www.godaddy.com/tr-tr/domainsearch/find?domainToCheck=${domain}`, '_blank')}
+                                >
+                                  <ShoppingCart className="w-4 h-4 mr-2" />
+                                  Satın Al
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(domain)}
+                                >
+                                  <Copy className="w-4 h-4 mr-2" />
+                                  Kopyala
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleFavorite(domain)}
+                                >
+                                  <Heart className={`w-4 h-4 ${favorites.includes(domain) ? 'fill-red-500 text-red-500' : ''}`} />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

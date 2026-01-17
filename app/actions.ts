@@ -29,6 +29,32 @@ Rules:
   return names
 }
 
+export async function analyzeBestDomains(availableDomains: string[]) {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+  
+  const prompt = `Analyze these available domain names and rank the top 10 best ones:
+
+${availableDomains.join('\n')}
+
+Consider:
+- Brandability and memorability
+- Length (shorter is better)
+- Pronunciation ease
+- Commercial potential
+- SEO friendliness
+
+Return ONLY the domain names in order from best to worst, one per line, no explanations.`
+
+  const result = await model.generateContent(prompt)
+  const text = result.response.text()
+  const ranked = text
+    .split('\n')
+    .map((n) => n.trim().toLowerCase())
+    .filter((n) => n.length > 0)
+  
+  return ranked
+}
+
 export async function checkDomain(name: string) {
   const priority = ['ai', 'to', 'com', 'dev', 'app', 'io']
   const others = ['net', 'org', 'co', 'xyz', 'me', 'tech', 'online']
