@@ -56,9 +56,8 @@ Return ONLY the domain names in order from best to worst, one per line, no expla
 }
 
 export async function checkDomain(name: string) {
-  const priority = ['ai', 'to', 'com', 'dev', 'app', 'io']
-  const others = ['net', 'org', 'co', 'xyz', 'me', 'tech', 'online']
-  const extensions = [...priority, ...others]
+  const priority = ['ai', 'to', 'io']
+  const extensions = priority
   
   const results = await Promise.all(
     extensions.map(async (ext) => {
@@ -69,14 +68,14 @@ export async function checkDomain(name: string) {
         return { 
           domain, 
           available: data.Status === 3, 
-          priority: priority.includes(ext),
+          priority: true,
           price: getPriceEstimate(ext)
         }
       } catch {
         return { 
           domain, 
           available: false, 
-          priority: priority.includes(ext),
+          priority: true,
           price: getPriceEstimate(ext)
         }
       }
