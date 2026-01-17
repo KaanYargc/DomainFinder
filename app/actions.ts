@@ -4,14 +4,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
-export async function generateDomainNames(keywords: string) {
+export async function generateDomainNames(keywords: string, count: number = 40) {
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
   
   const prompt = `Given these keywords: "${keywords}"
 
-Generate 40 domain name suggestions (without extensions):
-- First 20: Similar words and synonyms related to the keywords
-- Next 20: Creative combinations and derivatives of the keywords
+Generate ${count} domain name suggestions (without extensions):
+- First half: Similar words and synonyms related to the keywords
+- Second half: Creative combinations and derivatives of the keywords
 
 Rules:
 - Keep names short (5-12 characters)

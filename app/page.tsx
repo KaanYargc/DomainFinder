@@ -48,6 +48,7 @@ export default function Home() {
   const [analyzingPhase2, setAnalyzingPhase2] = useState(false)
   const [selectedDomains, setSelectedDomains] = useState<string[]>([])
   const [commandOpen, setCommandOpen] = useState(false)
+  const [domainCount, setDomainCount] = useState(40)
 
   useEffect(() => {
     const saved = localStorage.getItem('favorites')
@@ -84,7 +85,7 @@ export default function Home() {
     setProgressText('AI domain isimleri oluşturuluyor...')
     setProgress(10)
     
-    const names = await generateDomainNames(keywords)
+    const names = await generateDomainNames(keywords, domainCount)
     
     // Mevcut sonuçları koru, yeni önerileri ekle
     setSuggestions(prev => [...prev, ...names.filter(n => !prev.includes(n))])
@@ -328,18 +329,49 @@ export default function Home() {
               </TooltipContent>
             </Tooltip>
             <ThemeToggle />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 dark:bg-slate-800">
+                <div className="space-y-4">
+                  <h4 className="font-medium leading-none">Ayarlar</h4>
+                  <Separator />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Domain Sayısı</label>
+                    <Select value={domainCount.toString()} onValueChange={(v) => setDomainCount(Number(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="20">20 Domain</SelectItem>
+                        <SelectItem value="40">40 Domain</SelectItem>
+                        <SelectItem value="60">60 Domain</SelectItem>
+                        <SelectItem value="80">80 Domain</SelectItem>
+                        <SelectItem value="100">100 Domain</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      AI tarafından üretilecek domain sayısı
+                    </p>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
         <Card className="dark:bg-slate-800 dark:border-slate-700">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Input
                 placeholder="örnek: tech, startup, innovation"
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-                className="flex-1 dark:bg-slate-900 dark:text-white"
+                className="flex-1 dark:bg-slate-900 dark:text-white dark:border-slate-600"
                 disabled={loading}
               />
               <Button onClick={handleGenerate} disabled={loading}>
@@ -798,24 +830,26 @@ export default function Home() {
         )}
 
         {/* Command Palette */}
-        <Command open={commandOpen} onOpenChange={setCommandOpen} className="rounded-lg border shadow-md">
-          <CommandInput placeholder="Komut veya domain ara..." />
-          <CommandList>
-            <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
-            <CommandGroup heading="Hızlı Eylemler">
-              <CommandItem onSelect={() => { handleGenerate(); setCommandOpen(false) }}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                <span>Yeni Domain Öner</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { clearAllDomains(); setCommandOpen(false) }}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Tüm Domainleri Sil</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { setPhase(phase === 1 ? 2 : 1); setCommandOpen(false) }}>
-                <Filter className="mr-2 h-4 w-4" />
-                <span>Faz {phase === 1 ? '2' : '1'}'e Geç</span>
-              </CommandItem>
-            </CommandGroup>
+        <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
+          <DialogContent className="p-0 dark:bg-slate-800">
+            <Command className="rounded-lg border-none">
+              <CommandInput placeholder="Komut veya domain ara..." />
+              <CommandList>
+                <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
+                <CommandGroup heading="Hızlı Eylemler">
+                  <CommandItem onSelect={() => { handleGenerate(); setCommandOpen(false) }}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    <span>Yeni Domain Öner</span>
+                  </CommandItem>
+                  <CommandItem onSelect={() => { clearAllDomains(); setCommandOpen(false) }}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Tüm Domainleri Sil</span>
+                  </CommandItem>
+                  <CommandItem onSelect={() => { setPhase(phase === 1 ? 2 : 1); setCommandOpen(false) }}>
+                    <Filter className="mr-2 h-4 w-4" />
+                    <span>Faz {phase === 1 ? '2' : '1'}'e Geç</span>
+                  </CommandItem>
+                </CommandGroup>
             {history.length > 0 && (
               <CommandGroup heading="Son Aramalar">
                 {history.map(h => (
@@ -826,8 +860,10 @@ export default function Home() {
                 ))}
               </CommandGroup>
             )}
-          </CommandList>
-        </Command>
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
     </TooltipProvider>
